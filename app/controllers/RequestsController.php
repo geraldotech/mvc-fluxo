@@ -89,6 +89,7 @@ class RequestsController extends Controller
         $stageApproversMap = $this->requestModel->getStageApproversMap();
         $requestMissingNames = [];
         $requestApprovedNames = [];
+        $bulkActionItems = [];
 
         foreach ($items as &$item) {
             $decisionKey = (int) $item['id'] . ':' . $item['current_stage'];
@@ -128,6 +129,15 @@ class RequestsController extends Controller
             $item['can_purchase'] = $item['current_stage'] === RequestModel::STAGE_PURCHASING
                 && $item['item_status'] === RequestModel::ITEM_STATUS_OPEN
                 && $this->userCanActOnStage(RequestModel::STAGE_PURCHASING);
+
+            if ($item['can_approve']) {
+                $bulkActionItems[] = [
+                    'id' => (int) $item['id'],
+                    'item_name' => $item['item_name'],
+                    'category' => $item['category'],
+                    'price' => $item['price'],
+                ];
+            }
         }
         unset($item);
 
@@ -147,6 +157,7 @@ class RequestsController extends Controller
             'requestMissingNames' => $requestMissingNames,
             'requestApprovedNames' => $requestApprovedNames,
             'requestFlowStages' => $requestFlowStages,
+            'bulkActionItems' => $bulkActionItems,
             'stageLabels' => $this->getStageLabels(),
             'statusLabels' => $this->getStatusLabels(),
             'actionError' => $_SESSION['request_action_error'] ?? null,
@@ -172,6 +183,52 @@ class RequestsController extends Controller
         $_SESSION[$ok ? 'request_action_success' : 'request_action_error'] = $ok
             ? 'Decisao registrada com sucesso.'
             : 'Nao foi possivel registrar a decisao.';
+
+        $this->redirect('requests/show/' . $requestId);
+    }
+
+    public function decideStage($id = null): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->redirect('requests');
+        }
+
+        $requestId = (int) $id;
+        $request = $this->requestModel->findRequestById($requestId);
+
+        if ($requestId <= 0 || $request === null) {
+            $_SESSION['request_action_error'] = 'Solicitacao nao encontrada.';
+            $this->redirect('requests');
+        }
+
+        $user = Auth::user();
+        $actionableItemIds = array_values(array_unique(array_map('intval', $_POST['actionable_item_ids'] ?? [])));
+        $approvedItemIds = array_values(array_unique(array_map('intval', $_POST['approved_item_ids'] ?? [])));
+
+        if (empty($actionableItemIds)) {
+            $_SESSION['request_action_error'] = 'Nenhum item disponivel para decisao nesta etapa.';
+            $this->redirect('requests/show/' . $requestId);
+        }
+
+        $successCount = 0;
+
+        foreach ($actionableItemIds as $itemId) {
+            $decision = in_array($itemId, $approvedItemIds, true)
+                ? RequestModel::DECISION_APPROVED
+                : RequestModel::DECISION_REJECTED;
+
+            if ($this->requestModel->approveOrRejectItem($itemId, (int) ($user['id'] ?? 0), $decision)) {
+                $successCount++;
+            }
+        }
+
+        if ($successCount === 0) {
+            $_SESSION['request_action_error'] = 'Nao foi possivel registrar as decisoes desta etapa.';
+        } elseif ($successCount < count($actionableItemIds)) {
+            $_SESSION['request_action_success'] = 'Parte das decisoes foi registrada. Alguns itens ja nao estavam mais disponiveis.';
+        } else {
+            $_SESSION['request_action_success'] = 'Decisoes da etapa registradas com sucesso.';
+        }
 
         $this->redirect('requests/show/' . $requestId);
     }

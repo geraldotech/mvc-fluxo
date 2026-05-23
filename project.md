@@ -46,8 +46,8 @@ e isso dispara um fluxo de solicitação onde os itens passarão por etapas de a
 | Ordem | Etapa                                             | papel        |
 | ----- | ------------------------                          | ------------------    |
 | 1     | Solicitação Aberta                                | SOLICITANTE_APPROVAL  |
-| 2     | Aprovação Administrativa                          | ADMIN_APPROVAL        |
-| 3     | Aprovação Financeira                              | FINANCIAL_APPROVAL    |
+| 2     | Aprovação Administrativa ambos devem aprovar                         | ADMIN_APPROVAL        |
+| 3     | Aprovação Financeira  ja pode aprovar ou reprovar                            | FINANCIAL_APPROVAL    |
 | 4     | Compra em Andamento (pode anexar compronante)     | PURCHASING            |
 | 5     | Finalizado quando a etapa anterior for finalizada | COMPLETED              |
 

@@ -21,6 +21,40 @@
             <div class="alert alert-success" role="alert"><?= htmlspecialchars($actionSuccess, ENT_QUOTES, 'UTF-8'); ?></div>
         <?php endif; ?>
 
+        <?php if (!empty($bulkActionItems)): ?>
+            <div class="card border mb-4">
+                <div class="card-body">
+                    <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-lg-between gap-3 mb-3">
+                        <div>
+                            <h2 class="h5 mb-1">Decisao em lote da etapa atual</h2>
+                            <p class="text-secondary mb-0">Marque os itens que devem ser aprovados. Itens nao marcados serao reprovados ao enviar.</p>
+                        </div>
+                        <span class="badge text-bg-light border"><?= count($bulkActionItems); ?> item(ns) aguardando</span>
+                    </div>
+
+                    <form method="post" action="<?= htmlspecialchars((BASE_URL ?: '') . '/requests/decideStage/' . (int) $request['id'], ENT_QUOTES, 'UTF-8'); ?>">
+                        <div class="row g-2 mb-3">
+                            <?php foreach ($bulkActionItems as $bulkItem): ?>
+                                <div class="col-12 col-lg-6">
+                                    <label class="permission-option" for="approve-item-<?= (int) $bulkItem['id']; ?>">
+                                        <input type="hidden" name="actionable_item_ids[]" value="<?= (int) $bulkItem['id']; ?>">
+                                        <input class="form-check-input mt-0" id="approve-item-<?= (int) $bulkItem['id']; ?>" type="checkbox" name="approved_item_ids[]" value="<?= (int) $bulkItem['id']; ?>">
+                                        <span>
+                                            <strong class="d-block"><?= htmlspecialchars($bulkItem['item_name'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                                            <small class="text-secondary"><?= htmlspecialchars($bulkItem['category'], ENT_QUOTES, 'UTF-8'); ?> . R$ <?= htmlspecialchars(number_format((float) $bulkItem['price'], 2, ',', '.'), ENT_QUOTES, 'UTF-8'); ?></small>
+                                        </span>
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="d-flex justify-content-end">
+                            <button class="btn btn-primary" type="submit">Enviar decisoes da etapa</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        <?php endif; ?>
+
         <div class="card border bg-body-tertiary mb-4">
             <div class="card-body">
                 <div class="row g-3">
@@ -101,20 +135,7 @@
                             <?php endif; ?>
                         </div>
 
-                        <?php if ($item['can_approve']): ?>
-                            <div class="d-flex flex-wrap gap-2 mb-3">
-                                <form method="post" action="<?= htmlspecialchars((BASE_URL ?: '') . '/requests/decide/' . (int) $item['id'], ENT_QUOTES, 'UTF-8'); ?>">
-                                    <input type="hidden" name="request_id" value="<?= (int) $request['id']; ?>">
-                                    <input type="hidden" name="decision" value="APPROVED">
-                                    <button class="btn btn-success btn-sm" type="submit">Aprovar item</button>
-                                </form>
-                                <form method="post" action="<?= htmlspecialchars((BASE_URL ?: '') . '/requests/decide/' . (int) $item['id'], ENT_QUOTES, 'UTF-8'); ?>">
-                                    <input type="hidden" name="request_id" value="<?= (int) $request['id']; ?>">
-                                    <input type="hidden" name="decision" value="REJECTED">
-                                    <button class="btn btn-outline-danger btn-sm" type="submit">Reprovar item</button>
-                                </form>
-                            </div>
-                        <?php elseif ($item['can_purchase']): ?>
+                        <?php if ($item['can_purchase']): ?>
                             <form class="row g-2 mb-3" method="post" action="<?= htmlspecialchars((BASE_URL ?: '') . '/requests/purchase/' . (int) $item['id'], ENT_QUOTES, 'UTF-8'); ?>">
                                 <input type="hidden" name="request_id" value="<?= (int) $request['id']; ?>">
                                 <div class="col-12 col-lg-8">
@@ -126,6 +147,8 @@
                             </form>
                         <?php elseif ($item['user_decision'] !== null): ?>
                             <div class="alert alert-light border mb-3 py-2">Voce ja registrou sua decisao nesta etapa: <strong><?= htmlspecialchars($item['user_decision'], ENT_QUOTES, 'UTF-8'); ?></strong>.</div>
+                        <?php elseif ($item['can_approve']): ?>
+                            <div class="alert alert-light border mb-3 py-2">Este item aguarda sua decisao no envio em lote acima.</div>
                         <?php endif; ?>
 
                         <?php if (!empty($item['receipt_note'])): ?>
