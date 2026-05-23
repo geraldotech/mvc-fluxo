@@ -120,7 +120,7 @@
                     <strong class="d-block mb-1">Onde esta agora</strong>
                     <span><?= htmlspecialchars($stageLabels[$request['current_stage']] ?? $request['current_stage'], ENT_QUOTES, 'UTF-8'); ?></span>
                 </div> -->
-             <!--    <div class="col-12 col-lg-4">
+                <!--    <div class="col-12 col-lg-4">
                     <strong class="d-block mb-1">Quem falta nesta etapa</strong>
                     <?php if (empty($requestMissingNames) || !in_array($request['current_stage'], ['ADMIN_APPROVAL', 'FINANCIAL_APPROVAL', 'PURCHASING'], true)): ?>
                         <span class="text-secondary">Nenhum pendente nesta etapa.</span>
@@ -142,7 +142,7 @@
                 </div> -->
                 <div class="col-12">
                     <strong class="d-block mb-2">Etapas do fluxo</strong>
-                   <!--  <div class="d-flex flex-wrap gap-2">
+                    <!--  <div class="d-flex flex-wrap gap-2">
                         <?php foreach ($requestFlowStages as $stage): ?>
                             <?php
                             $stageClass = 'flow-stage-badge flow-stage-badge-pending';
@@ -354,13 +354,14 @@
     </div>
 
     <div class="vstack gap-3">
-        <h2 class="h5 mb-1">History:</h2>
+
         <?php foreach ($items as $item): ?>
             <?php if ($item['item_status'] === 'REJECTED'): ?>
                 <?php continue; ?>
             <?php endif; ?>
             <div class="card border">
                 <div class="card-body">
+                    <h2 class="h5 mb-1">History:</h2>
                     <div class="d-flex flex-column flex-lg-row justify-content-lg-between gap-3 mb-3">
                         <div>
                             <h2 class="h5 mb-1"><?= htmlspecialchars($item['item_name'], ENT_QUOTES, 'UTF-8'); ?></h2>
