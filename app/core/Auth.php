@@ -59,6 +59,18 @@ class Auth
         exit('Acesso negado.');
     }
 
+    public static function requirePermission(string $permission): void
+    {
+        self::requireLogin();
+
+        if (self::hasPermission($permission)) {
+            return;
+        }
+
+        http_response_code(403);
+        exit('Acesso negado.');
+    }
+
     public static function hasPermission(string $permission): bool
     {
         $user = self::user();

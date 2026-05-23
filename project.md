@@ -4,7 +4,6 @@
 
 sistema de login, só pode ver as paginas se tiver logado
 
-ja esta conectado ao banco de dados criar tabela para os logis
 
 id, login, nome, password
 
@@ -24,18 +23,39 @@ PURCHASING_APPROVAL
 - price
 - categeory
 
-## o usuario logado vai poder selecionar itens (previamente cadastrados) e isso dispara um fluxo de solicitação
 
-## os itens passarão por etapas de aprovação, é necessario que cada gestor aprove ou reprove, se um reprovar já não é possivel proseguir é necessário ambos ou sei lá quantos gestores tiver aprovar o items para a proxima etapa
+## pagina solicitação de compras
 
-## Ordem Etapa Status técnico do fluxo
+- titulo da solicitação
+- selecionar vários itens numa lista (previamente cadastrados) 
+- no clique abre o fluxo seguindo
 
-1 Solicitação Aberta OPEN
-2 Aprovação Administrativa ADMIN_APPROVAL
-3 Aprovação Financeira FINANCIAL_APPROVAL
-4 Compra em Andamento PURCHASING
-5 Finalizado COMPLETED
-X Reprovado REJECTED
+e isso dispara um fluxo de solicitação onde os itens passarão por etapas de aprovação, é necessario que cada gestor aprove ou reprove, se um reprovar já não é possivel proseguir é necessário ambos ou sei lá quantos gestores tiver aprovar o items para a proxima etapa
+
+
+## Ordem Etapa do fluxo + papel
+
+1. Usuário cria solicitação -> papel de Solicitante
+2. Sistema gera itens pendentes
+3. Gestores aprovam/reprovam item por item
+4. Quando todos aprovam, a etapa segue para a próxima APENAS com os itens aprovados sempre permitaindo os que tem o approvel da etapa aprovar
+5. Financeiro aprova/reprova os itens aprovados
+7. Solicitação finaliza 
+
+
+| Ordem | Etapa                                             | papel        |
+| ----- | ------------------------                          | ------------------    |
+| 1     | Solicitação Aberta                                | SOLICITANTE_APPROVAL  |
+| 2     | Aprovação Administrativa                          | ADMIN_APPROVAL        |
+| 3     | Aprovação Financeira                              | FINANCIAL_APPROVAL    |
+| 4     | Compra em Andamento (pode anexar compronante)     | PURCHASING            |
+| 5     | Finalizado quando a etapa anterior for finalizada | COMPLETED              |
+
+
+# status das aprovações
+| X     | Reprovado                | REJECTED           |
+| X     | Aprovado                | Approved           |
+
 
 ```js
 fluxo: Compra padrão exemplo
