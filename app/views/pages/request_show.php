@@ -165,7 +165,7 @@
                     </div> -->
                     <div class="mt-3">
                         <strong class="d-block mb-2">Historico de aprovacoes por etapa</strong>
-                        <div class="row g-3">
+                        <div class="row g-3 flow-stage-grid">
                             <?php foreach ($requestFlowStages as $stage): ?>
                                 <?php
                                 $historyCardClass = 'flow-stage-card flow-stage-card-pending';
@@ -183,27 +183,27 @@
                                 } elseif (array_search($stage, $requestFlowStages, true) < array_search($request['current_stage'], $requestFlowStages, true)) {
                                     $historyCardClass = 'flow-stage-card flow-stage-card-done';
                                     $historyBadgeClass = 'flow-stage-mini-badge flow-stage-mini-badge-done';
-                                    $historyBadgeLabel = 'Etapa concluida';
+                                    $historyBadgeLabel = 'Concluída';
                                 }
                                 ?>
-                                <div class="col-12 col-md-6 col-xl-3">
+                                <div class="col-12 col-md-6 col-xl-3 flow-stage-step">
                                     <div class="<?= $historyCardClass; ?>">
-                                        <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-2 mb-2">
-                                            <strong><?= htmlspecialchars($stageLabels[$stage] ?? $stage, ENT_QUOTES, 'UTF-8'); ?></strong>
+                                        <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-lg-between gap-2 mb-3">
+                                            <strong class="flow-stage-title"><?= htmlspecialchars($stageLabels[$stage] ?? $stage, ENT_QUOTES, 'UTF-8'); ?></strong>
                                             <span class="<?= $historyBadgeClass; ?>">
                                                 <?= htmlspecialchars($historyBadgeLabel, ENT_QUOTES, 'UTF-8'); ?>
                                             </span>
                                         </div>
                                         <?php if (empty($requestStageHistory[$stage])): ?>
                                             <?php if ($stage === 'COMPLETED' && !empty($request['completed_at'])): ?>
-                                                <div class="small text-secondary">
-                                                    <strong>Finalizado em:</strong>
-                                                    <?= htmlspecialchars((string) $request['completed_at'], ENT_QUOTES, 'UTF-8'); ?>
+                                                <div class="flow-stage-summary">
+                                                    <span class="flow-stage-summary-label">Solicitacao encerrada</span>
+                                                    <div class="flow-stage-summary-value">Finalizado em: <?= htmlspecialchars((string) $request['completed_at'], ENT_QUOTES, 'UTF-8'); ?></div>
                                                 </div>
                                             <?php elseif ($stage === 'FINANCIAL_APPROVAL'): ?>
                                                 <div class="flow-stage-empty-block">
                                                     <div class="mb-3">
-                                                        <strong class="d-block mb-1">Responsaveis desta etapa</strong>
+                                                        <strong class="d-block mb-1 flow-stage-subtitle">Responsaveis desta etapa</strong>
                                                         <?php if (empty($financialResponsibleNames)): ?>
                                                             <span class="text-secondary">Nenhum responsavel configurado.</span>
                                                         <?php else: ?>
@@ -250,7 +250,7 @@
                                             <?php elseif ($stage === 'PURCHASING'): ?>
                                                 <div class="flow-stage-empty-block">
                                                     <div class="mb-3">
-                                                        <strong class="d-block mb-1">Responsaveis desta etapa</strong>
+                                                        <strong class="d-block mb-1 flow-stage-subtitle">Responsaveis desta etapa</strong>
                                                         <?php if (empty($purchasingResponsibleNames)): ?>
                                                             <span class="text-secondary">Nenhum responsavel configurado.</span>
                                                         <?php else: ?>
