@@ -21,7 +21,7 @@ class RequestsController extends Controller
         $this->view('pages/requests', [
             'title' => 'Solicitacoes',
             'requests' => $this->requestModel->getAllRequests(),
-            'items' => $this->itemModel->getAll(),
+            'items' => $this->itemModel->getAll(), 
             'pendingCounts' => $user === null ? [] : $this->requestModel->getPendingCountsForUser((int) $user['id']),
             'canCreate' => Auth::hasPermission('solicitante_approval'),
             'formError' => $_SESSION['request_form_error'] ?? null,
@@ -90,11 +90,30 @@ class RequestsController extends Controller
         $requestMissingNames = [];
         $requestApprovedNames = [];
         $bulkActionItems = [];
+        $requestStageHistory = [];
+        $financialResponsibleNames = array_values(array_map(
+            fn (array $approver): string => $approver['name'],
+            $stageApproversMap[RequestModel::STAGE_FINANCIAL] ?? []
+        ));
+        $financialReadyItems = [];
+        $purchasingResponsibleNames = array_values(array_map(
+            fn (array $approver): string => $approver['name'],
+            $stageApproversMap[RequestModel::STAGE_PURCHASING] ?? []
+        ));
+        $purchasingReadyItems = [];
 
         foreach ($items as &$item) {
             $decisionKey = (int) $item['id'] . ':' . $item['current_stage'];
             $item['user_decision'] = $userDecisions[$decisionKey] ?? null;
             $item['history'] = $approvals[(int) $item['id']] ?? [];
+            $item['previous_stage_approved_names'] = array_values(array_unique(array_map(
+                fn (array $approval): string => (string) $approval['approver_name'],
+                array_filter(
+                    $item['history'],
+                    fn (array $approval): bool => $approval['stage_code'] === RequestModel::STAGE_FINANCIAL
+                        && $approval['decision'] === RequestModel::DECISION_APPROVED
+                )
+            )));
             $item['required_approvals'] = $approverCounts[$item['current_stage']] ?? 0;
             $item['approved_count'] = count(array_filter(
                 $item['history'],
@@ -128,7 +147,9 @@ class RequestsController extends Controller
                 && $this->userCanActOnStage($item['current_stage']);
             $item['can_purchase'] = $item['current_stage'] === RequestModel::STAGE_PURCHASING
                 && $item['item_status'] === RequestModel::ITEM_STATUS_OPEN
-                && $this->userCanActOnStage(RequestModel::STAGE_PURCHASING);
+                && $this->userCanActOnStage(RequestModel::STAGE_PURCHASING)
+                && $user !== null
+                && in_array((string) ($user['name'] ?? ''), $item['previous_stage_approved_names'], true);
 
             if ($item['can_approve']) {
                 $bulkActionItems[] = [
@@ -138,11 +159,56 @@ class RequestsController extends Controller
                     'price' => $item['price'],
                 ];
             }
+
+            if ($item['current_stage'] === RequestModel::STAGE_FINANCIAL && $item['item_status'] === RequestModel::ITEM_STATUS_OPEN) {
+                if (!empty($financialResponsibleNames)) {
+                    $financialReadyItems[] = [
+                        'item_name' => $item['item_name'],
+                        'decisions' => array_map(
+                            fn (string $approverName): array => [
+                                'approver_name' => $approverName,
+                                'decision' => 'AGUARDANDO_APROVACAO',
+                                'comment' => '',
+                                'decided_at' => '',
+                            ],
+                            $financialResponsibleNames
+                        ),
+                    ];
+                }
+            }
+
+            if ($item['current_stage'] === RequestModel::STAGE_PURCHASING && $item['item_status'] === RequestModel::ITEM_STATUS_OPEN) {
+                if (!empty($item['previous_stage_approved_names'])) {
+                    $purchasingReadyItems[] = [
+                        'item_name' => $item['item_name'],
+                        'decisions' => array_map(
+                            fn (string $approverName): array => [
+                                'approver_name' => $approverName,
+                                'decision' => 'AGUARDANDO_COMPRA',
+                                'comment' => '',
+                                'decided_at' => '',
+                            ],
+                            $item['previous_stage_approved_names']
+                        ),
+                    ];
+                }
+            }
         }
         unset($item);
 
         $requestMissingNames = array_values(array_unique($requestMissingNames));
         $requestApprovedNames = array_values(array_unique($requestApprovedNames));
+        $purchasingResponsibleNames = array_values(array_unique(array_merge(
+            [],
+            ...array_map(
+                static fn (array $item): array => $item['current_stage'] === RequestModel::STAGE_PURCHASING
+                    && $item['item_status'] === RequestModel::ITEM_STATUS_OPEN
+                    ? ($item['previous_stage_approved_names'] ?? [])
+                    : [],
+                $items
+            )
+        )));
+        $requestStageHistory = $this->buildRequestStageHistory($items);
         $requestFlowStages = [
             RequestModel::STAGE_ADMIN,
             RequestModel::STAGE_FINANCIAL,
@@ -157,7 +223,12 @@ class RequestsController extends Controller
             'requestMissingNames' => $requestMissingNames,
             'requestApprovedNames' => $requestApprovedNames,
             'requestFlowStages' => $requestFlowStages,
+            'requestStageHistory' => $requestStageHistory,
             'bulkActionItems' => $bulkActionItems,
+            'financialResponsibleNames' => $financialResponsibleNames,
+            'financialReadyItems' => $financialReadyItems,
+            'purchasingResponsibleNames' => $purchasingResponsibleNames,
+            'purchasingReadyItems' => $purchasingReadyItems,
             'stageLabels' => $this->getStageLabels(),
             'statusLabels' => $this->getStatusLabels(),
             'actionError' => $_SESSION['request_action_error'] ?? null,
@@ -346,5 +417,116 @@ class RequestsController extends Controller
         }
 
         return array_slice($flow, $index);
+    }
+
+    private function buildRequestStageHistory(array $items): array
+    {
+        $historyByStage = [];
+
+        foreach ($items as $item) {
+            foreach ($item['history'] as $entry) {
+                $stage = $entry['stage_code'];
+                $itemKey = $stage . ':' . $item['item_name'];
+
+                if (!isset($historyByStage[$stage][$itemKey])) {
+                    $historyByStage[$stage][$itemKey] = [
+                        'item_name' => $item['item_name'],
+                        'decisions' => [],
+                    ];
+                }
+
+                $historyByStage[$stage][$itemKey]['decisions'][] = [
+                    'approver_name' => $entry['approver_name'],
+                    'decision' => $entry['decision'],
+                    'comment' => $entry['comment'] ?? '',
+                    'decided_at' => $entry['decided_at'],
+                ];
+            }
+
+            if (
+                $item['item_status'] === RequestModel::ITEM_STATUS_OPEN
+                && in_array($item['current_stage'], [RequestModel::STAGE_ADMIN, RequestModel::STAGE_FINANCIAL, RequestModel::STAGE_PURCHASING], true)
+            ) {
+                $stage = $item['current_stage'];
+                $itemKey = $stage . ':' . $item['item_name'];
+
+                if (!isset($historyByStage[$stage][$itemKey])) {
+                    $historyByStage[$stage][$itemKey] = [
+                        'item_name' => $item['item_name'],
+                        'decisions' => [],
+                    ];
+                }
+
+                $existingApprovers = array_values(array_map(
+                    fn (array $decision): string => $decision['approver_name'],
+                    $historyByStage[$stage][$itemKey]['decisions']
+                ));
+
+                foreach (($item['current_stage_approvers'] ?? []) as $approver) {
+                    $approverName = (string) ($approver['name'] ?? '');
+
+                    if ($approverName === '' || in_array($approverName, $existingApprovers, true)) {
+                        continue;
+                    }
+
+                    $historyByStage[$stage][$itemKey]['decisions'][] = [
+                        'approver_name' => $approverName,
+                        'decision' => $stage === RequestModel::STAGE_PURCHASING ? 'AGUARDANDO_COMPRA' : 'AGUARDANDO_APROVACAO',
+                        'comment' => '',
+                        'decided_at' => '',
+                    ];
+                }
+            }
+
+            if (
+                !empty($item['completed_at'])
+                && $item['current_stage'] === RequestModel::STAGE_COMPLETED
+                && $item['item_status'] === RequestModel::ITEM_STATUS_COMPLETED
+            ) {
+                $stage = RequestModel::STAGE_PURCHASING;
+                $itemKey = $stage . ':' . $item['item_name'];
+
+                if (!isset($historyByStage[$stage][$itemKey])) {
+                    $historyByStage[$stage][$itemKey] = [
+                        'item_name' => $item['item_name'],
+                        'decisions' => [],
+                    ];
+                }
+
+                $historyByStage[$stage][$itemKey]['decisions'][] = [
+                    'approver_name' => $item['purchased_by_name'] ?: 'Usuario responsavel',
+                    'decision' => 'COMPRA_FINALIZADA',
+                    'comment' => $item['receipt_note'] ?? '',
+                    'decided_at' => $item['completed_at'],
+                ];
+            }
+        }
+
+        foreach ($historyByStage as $stage => $entries) {
+            foreach ($entries as $itemKey => $itemEntry) {
+                usort(
+                    $itemEntry['decisions'],
+                    function (array $left, array $right): int {
+                        $leftDate = (string) ($left['decided_at'] ?? '');
+                        $rightDate = (string) ($right['decided_at'] ?? '');
+
+                        if ($leftDate === '' && $rightDate !== '') {
+                            return 1;
+                        }
+
+                        if ($leftDate !== '' && $rightDate === '') {
+                            return -1;
+                        }
+
+                        return strcmp($leftDate, $rightDate);
+                    }
+                );
+                $entries[$itemKey] = $itemEntry;
+            }
+
+            $historyByStage[$stage] = array_values($entries);
+        }
+
+        return $historyByStage;
     }
 }

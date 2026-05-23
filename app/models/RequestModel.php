@@ -44,6 +44,7 @@ class RequestModel extends Model
                 pr.current_stage,
                 pr.status,
                 pr.created_at,
+                pr.completed_at,
                 u.name AS creator_name,
                 COUNT(ri.id) AS total_items,
                 SUM(CASE WHEN ri.item_status = "COMPLETED" THEN 1 ELSE 0 END) AS completed_items,
@@ -51,7 +52,7 @@ class RequestModel extends Model
              FROM purchase_requests pr
              INNER JOIN users u ON u.id = pr.created_by
              LEFT JOIN purchase_request_items ri ON ri.request_id = pr.id
-             GROUP BY pr.id, pr.title, pr.current_stage, pr.status, pr.created_at, u.name
+             GROUP BY pr.id, pr.title, pr.current_stage, pr.status, pr.created_at, pr.completed_at, u.name
              ORDER BY pr.created_at DESC'
         );
 
@@ -187,10 +188,11 @@ class RequestModel extends Model
         }
 
         $statement = $this->db->prepare(
-            'SELECT *
-             FROM purchase_request_items
+            'SELECT pri.*, u.name AS purchased_by_name
+             FROM purchase_request_items pri
+             LEFT JOIN users u ON u.id = pri.purchased_by
              WHERE request_id = :request_id
-             ORDER BY id ASC'
+             ORDER BY pri.id ASC'
         );
         $statement->execute(['request_id' => $requestId]);
 
@@ -409,11 +411,18 @@ CREATE TABLE IF NOT EXISTS purchase_requests (
     created_by INT UNSIGNED NOT NULL,
     current_stage VARCHAR(40) NOT NULL DEFAULT 'OPEN',
     status VARCHAR(40) NOT NULL DEFAULT 'OPEN',
+    completed_at TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_purchase_requests_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 SQL
+        );
+
+        $this->ensureColumnExists(
+            'purchase_requests',
+            'completed_at',
+            'ALTER TABLE purchase_requests ADD COLUMN completed_at TIMESTAMP NULL DEFAULT NULL AFTER status'
         );
 
         $this->db?->exec(
@@ -674,17 +683,52 @@ SQL
             $status = self::REQUEST_STATUS_COMPLETED;
         }
 
-        $update = $this->db->prepare(
-            'UPDATE purchase_requests
-             SET current_stage = :current_stage,
-                 status = :status
-             WHERE id = :id'
-        );
+        if ($status === self::REQUEST_STATUS_OPEN) {
+            $update = $this->db->prepare(
+                'UPDATE purchase_requests
+                 SET current_stage = :current_stage,
+                     status = :status,
+                     completed_at = NULL
+                 WHERE id = :id'
+            );
+        } else {
+            $update = $this->db->prepare(
+                'UPDATE purchase_requests
+                 SET current_stage = :current_stage,
+                     status = :status,
+                     completed_at = COALESCE(completed_at, NOW())
+                 WHERE id = :id'
+            );
+        }
+
         $update->execute([
             'current_stage' => $currentStage,
             'status' => $status,
             'id' => $requestId,
         ]);
+    }
+
+    private function ensureColumnExists(string $table, string $column, string $alterSql): void
+    {
+        if ($this->db === null) {
+            return;
+        }
+
+        $statement = $this->db->prepare(
+            'SELECT COUNT(*)
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = :table_name
+               AND COLUMN_NAME = :column_name'
+        );
+        $statement->execute([
+            'table_name' => $table,
+            'column_name' => $column,
+        ]);
+
+        if ((int) $statement->fetchColumn() === 0) {
+            $this->db->exec($alterSql);
+        }
     }
 
     private function countPendingStageForUser(array $user, string $stage): int

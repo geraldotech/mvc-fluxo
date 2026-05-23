@@ -29,7 +29,6 @@ $authUser = Auth::user();
                         <?php if ($authUser !== null): ?>
                             <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars(BASE_URL ?: '/', ENT_QUOTES, 'UTF-8'); ?>">Painel</a></li>
                             <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars((BASE_URL ?: '') . '/requests', ENT_QUOTES, 'UTF-8'); ?>">Solicitacoes</a></li>
-                            <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars((BASE_URL ?: '') . '/downloads', ENT_QUOTES, 'UTF-8'); ?>">Arquivos</a></li>
                             <?php if (($authUser['is_admin'] ?? false) === true): ?>
                                 <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars((BASE_URL ?: '') . '/users', ENT_QUOTES, 'UTF-8'); ?>">Usuarios</a></li>
                                 <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars((BASE_URL ?: '') . '/items', ENT_QUOTES, 'UTF-8'); ?>">Itens</a></li>
