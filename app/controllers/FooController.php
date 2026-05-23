@@ -1,0 +1,25 @@
+<?php
+
+declare(strict_types=1);
+
+class FooController extends Controller
+{
+    private AboutModel $aboutModel;
+
+    public function __construct()
+    {
+        $this->aboutModel = $this->model('AboutModel');
+    }
+
+    public function index(): void
+    {
+        $data = [
+            'title' => 'About foo',
+            'description' => 'Projeto base com controllers separados, model compartilhado, views e assets em CSS/JS puro.',
+            'users' => $this->aboutModel->getUsers(),
+            'dbError' => $this->aboutModel->getLastError(),
+        ];
+
+        $this->view('pages/foo', $data);
+    }
+}
